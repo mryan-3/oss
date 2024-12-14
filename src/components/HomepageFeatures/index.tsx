@@ -1,70 +1,48 @@
-import clsx from 'clsx';
-import Heading from '@theme/Heading';
-import styles from './styles.module.css';
+import clsx from 'clsx'
+import Heading from '@theme/Heading'
+import styles from './styles.module.css'
+import Link from '@docusaurus/Link'
 
 type FeatureItem = {
-  title: string;
-  Svg: React.ComponentType<React.ComponentProps<'svg'>>;
-  description: JSX.Element;
-};
+    title: string
+    image: string
+    description: JSX.Element
+}
 
 const FeatureList: FeatureItem[] = [
-  {
-    title: 'Easy to Use',
-    Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
-    description: (
-      <>
-        Docusaurus was designed from the ground up to be easily installed and
-        used to get your website up and running quickly.
-      </>
-    ),
-  },
-  {
-    title: 'Focus on What Matters',
-    Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
-    description: (
-      <>
-        Docusaurus lets you focus on your docs, and we&apos;ll do the chores. Go
-        ahead and move your docs into the <code>docs</code> directory.
-      </>
-    ),
-  },
-  {
-    title: 'Powered by React',
-    Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
-    description: (
-      <>
-        Extend or customize your website layout by reusing React. Docusaurus can
-        be extended while reusing the same header and footer.
-      </>
-    ),
-  },
-];
+    {
+        title: 'Mpesa SDK',
+        image: '/img/mpesa_api.png',
+        description: <>A simple SDK to help you integrate Mpesa into your application. With great documentation and support, you can get started in minutes.</>
+    }
+]
 
-function Feature({title, Svg, description}: FeatureItem) {
-  return (
-    <div className={clsx('col col--4')}>
-      <div className="text--center">
-        <Svg className={styles.featureSvg} role="img" />
-      </div>
-      <div className="text--center padding-horiz--md">
-        <Heading as="h3">{title}</Heading>
-        <p>{description}</p>
-      </div>
-    </div>
-  );
+function Feature({ title, image, description }: FeatureItem) {
+    return (
+        <Link href='/docs/mpesa' className={clsx('col col--4 border text-black hover:text-black hover:opacity-80 hover:no-underline bg-slate-100')}>
+            <div className='text--center'>
+                <img src={image} alt={title} className='padding-vert--md' />
+            </div>
+            <div className='text--center padding-horiz--md'>
+                <Heading as='h3'>{title}</Heading>
+                <p>{description}</p>
+            </div>
+        </Link>
+    )
 }
 
 export default function HomepageFeatures(): JSX.Element {
-  return (
-    <section className={styles.features}>
-      <div className="container">
-        <div className="row">
-          {FeatureList.map((props, idx) => (
-            <Feature key={idx} {...props} />
-          ))}
-        </div>
-      </div>
-    </section>
-  );
+    return (
+        <section id='projects' className={clsx(styles.features, 'flex flex-col')}>
+            <h2 className='font-semibold text-4xl text-start mr-auto container my-8'>🧰 Projects</h2>
+            <hr className='container mb-8 bg-gray-200'/>
+            <div className='container'>
+                <div className='row'>
+                    {FeatureList.map((props, idx) => (
+                        <Feature key={idx} {...props} />
+                    ))}
+                </div>
+            </div>
+        </section>
+    )
 }
