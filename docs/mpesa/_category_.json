@@ -1,7 +1,8 @@
 {
-  "label": "Mpesa SDK",
-  "position": 3,
+  "label": "Mpesa SDK - NodeJS",
+  "position": 2,
   "link": {
-    "type": "generated-index"
+    "type": "generated-index",
+    "description": "Documentation for @zenetra/mpesa-sdk nodejs package."
   }
 }
