@@ -1,47 +1,42 @@
 ---
 sidebar_position: 1
+title: Introduction
+slug: /
 ---
 
-# Tutorial Intro
+# Zenetra Labs OSS
 
-Let's discover **Docusaurus in less than 5 minutes**.
+At **Zenetra Labs**, we are dedicated to building and sharing open-source tools and technologies that empower developers and businesses worldwide. Our mission is to foster innovation, collaboration, and accessibility through high-quality, community-driven projects.
 
-## Getting Started
+## What You'll Find Here
 
-Get started by **creating a new site**.
+This documentation is your gateway to understanding, integrating, and contributing to the open-source projects developed by Zenetra Labs. Inside, you'll find:
 
-Or **try Docusaurus immediately** with **[docusaurus.new](https://docusaurus.new)**.
+- **Getting Started Guides**: Learn how to install, configure, and use our tools effectively.
+- **API References**: Detailed documentation on how to interact with our APIs and SDKs.
+- **Best Practices**: Tips and recommendations for optimizing your workflows using our solutions.
+- **Contribution Guides**: Step-by-step instructions for contributing to our projects and becoming a part of our growing community.
+- **FAQs and Troubleshooting**: Quick answers to common questions and issues.
 
-### What you'll need
+## Why Open Source?
 
-- [Node.js](https://nodejs.org/en/download/) version 18.0 or above:
-  - When installing Node.js, you are recommended to check all checkboxes related to dependencies.
+We believe that open source is more than just a way to share code—it's a movement to democratize technology, foster innovation, and build solutions that benefit everyone. By open-sourcing our work, we aim to:
 
-## Generate a new site
+- Enable transparency and trust.
+- Accelerate development through collaboration.
+- Build a community of like-minded innovators.
 
-Generate a new Docusaurus site using the **classic template**.
+## Join the Community
 
-The classic template will automatically be added to your project after you run the command:
+Zenetra Labs thrives on the collective efforts of developers and contributors from around the globe. Here's how you can get involved:
 
-```bash
-npm init docusaurus@latest my-website classic
-```
+- **Star and Fork** our repositories on [GitHub](https://github.com/zenetralabs).
+- **Report Issues** or suggest features to improve our projects.
+- **Contribute Code** by submitting pull requests or creating your own extensions.
+- **Engage** with our team and the community on forums, Discord, or social media.
 
-You can type this command into Command Prompt, Powershell, Terminal, or any other integrated terminal of your code editor.
+---
 
-The command also installs all necessary dependencies you need to run Docusaurus.
+Ready to dive in? Check out our [Getting Started](./getting-started) guide and start building with Zenetra Labs today!
 
-## Start your site
-
-Run the development server:
-
-```bash
-cd my-website
-npm run start
-```
-
-The `cd` command changes the directory you're working with. In order to work with your newly created Docusaurus site, you'll need to navigate the terminal there.
-
-The `npm run start` command builds your website locally and serves it through a development server, ready for you to view at http://localhost:3000/.
-
-Open `docs/intro.md` (this page) and edit some lines: the site **reloads automatically** and displays your changes.
+Let's innovate together 🚀.

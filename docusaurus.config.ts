@@ -84,17 +84,17 @@ const config: Config = {
         navbar: {
             title: 'Zenetra OSS',
             logo: {
-                href: 'https://zenetra.com',
+                href: '/',
                 alt: 'Zenetra Logo',
                 src: 'img/zenetra_logo.png'
             },
             items: [
                 {
                     position: 'left',
-                    label: 'Projects',
-                    to: '#projects'
+                    label: '📚 Docs',
+                    to: '/docs'
                 },
-                { to: '/blog', label: 'Blog', position: 'left' },
+                { to: '/blog', label: '📖 Blog', position: 'left' },
                 {
                     href: 'https://github.com/zenetralabs/oss',
                     label: 'GitHub',
@@ -110,7 +110,7 @@ const config: Config = {
                     items: [
                         {
                             label: 'Mpesa SDK',
-                            to: '/docs/mpesa'
+                            to: '/docs/category/mpesa-sdk'
                         }
                     ]
                 },
