@@ -19,7 +19,7 @@ const FeatureList: FeatureItem[] = [
 
 function Feature({ title, image, description }: FeatureItem) {
     return (
-        <Link href='/docs/category/mpesa-sdk' className={clsx('col col--4 border text-black hover:text-black hover:opacity-80 hover:no-underline bg-slate-100')}>
+        <Link href='/docs/category/mpesa-sdk---nodejs' className={clsx('col col--4 border text-black hover:text-black hover:opacity-80 hover:no-underline bg-slate-100')}>
             <div className='text--center'>
                 <img src={image} alt={title} className='padding-vert--md' />
             </div>
