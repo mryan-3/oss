@@ -1,0 +1,7 @@
+{
+    "title": "Mpesa SDK",
+    "description": "Easily integrate Mpesa",
+    "icon": "Building2",
+    "root": false,
+    "pages": ["---Guide---", "intro", "setup", "usage"]
+}
