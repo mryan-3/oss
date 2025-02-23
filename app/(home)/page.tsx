@@ -32,7 +32,7 @@ function Hero() {
 
                 <div className='mx-auto mt-8 flex justify-start md:mx-0'>
                     <Link
-                        href='/#contact-us'
+                        href='/docs'
                         className={
                             'text-lg border-2 border-black py-2 px-6 bg-[#88aaee] hover:opacity-90 text-black active:opacity-100 hover:border-1 dark:border-purple-50'
                         }
