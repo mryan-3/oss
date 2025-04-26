@@ -81,7 +81,7 @@ const OSSProjects = [
     {
         title: 'NodeJs Mpesa SDK',
         image: '/mpesa_api.png',
-        link: '/docs/mpesa',
+        link: '/docs/mpesa/intro',
         description: (
             <>
                 A simple SDK to help you integrate Mpesa into your application.
