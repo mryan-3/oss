@@ -1,0 +1,11 @@
+{
+  "title": "Stripe Integration",
+  "pages": [
+    "index",
+    "setup",
+    "implementation",
+    "webhooks",
+    "storage",
+    "troubleshooting"
+  ]
+}

@@ -1,0 +1,239 @@
+---
+title: Database and Cache
+description: Database models and caching implementation for Stripe integration
+---
+
+# Database and Cache Implementation
+
+## Database Models
+
+### Subscription Model
+
+```typescript
+interface ISubscription {
+  userId: Types.ObjectId;
+  stripeCustomerId: string;
+  stripeSubscriptionId: string | null;
+  planId: string;
+  planType: PlanType;
+  planName: string;
+  priceId: string;
+  amount: number;
+  currency: string;
+  status: SubscriptionStatus;
+  currentPeriodStart: Date;
+  currentPeriodEnd: Date;
+  cancelAtPeriodEnd: boolean;
+  metadata: {
+    paymentMethodBrand?: string | null;
+    paymentMethodLast4?: string | null;
+  };
+}
+
+const SubscriptionSchema = new Schema<ISubscription>({
+  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  stripeCustomerId: { type: String, required: true },
+  stripeSubscriptionId: { type: String },
+  planId: { type: String, required: true },
+  planType: { type: String, enum: Object.values(PlanType), required: true },
+  planName: { type: String, required: true },
+  priceId: { type: String, required: true },
+  amount: { type: Number, required: true },
+  currency: { type: String, required: true },
+  status: { type: String, enum: Object.values(SubscriptionStatus), required: true },
+  currentPeriodStart: { type: Date, required: true },
+  currentPeriodEnd: { type: Date, required: true },
+  cancelAtPeriodEnd: { type: Boolean, default: false },
+  metadata: {
+    paymentMethodBrand: String,
+    paymentMethodLast4: String
+  }
+});
+```
+
+### VIP Purchase Model
+
+```typescript
+interface IVipPurchase {
+  userId: Types.ObjectId;
+  stripeCustomerId: string;
+  vipOptionId: string;
+  status: 'active' | 'expired';
+  startTime: Date;
+  endTime: Date;
+  purchaseDate: Date;
+}
+
+const VipPurchaseSchema = new Schema<IVipPurchase>({
+  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  stripeCustomerId: { type: String, required: true },
+  vipOptionId: { type: String, required: true },
+  status: { type: String, enum: ['active', 'expired'], required: true },
+  startTime: { type: Date, required: true },
+  endTime: { type: Date, required: true },
+  purchaseDate: { type: Date, required: true }
+});
+```
+
+## Cache Implementation
+
+### Redis Implementation
+
+```typescript
+// utils/kv-store.ts
+import { Redis } from 'ioredis';
+import { Logger } from './logger';
+
+const redis = new Redis({
+  host: process.env.REDIS_HOST || 'localhost',
+  port: parseInt(process.env.REDIS_PORT || '6379'),
+  password: process.env.REDIS_PASSWORD,
+});
+
+export class KVStore {
+  async get<T>(key: string): Promise<T | null> {
+    try {
+      const value = await redis.get(key);
+      return value ? JSON.parse(value) : null;
+    } catch (error) {
+      Logger.error({ message: `KV Store get error: ${error}` });
+      return null;
+    }
+  }
+
+  async set(key: string, value: any, expirySeconds?: number): Promise<void> {
+    try {
+      const stringValue = JSON.stringify(value);
+      if (expirySeconds) {
+        await redis.setex(key, expirySeconds, stringValue);
+      } else {
+        await redis.set(key, stringValue);
+      }
+    } catch (error) {
+      Logger.error({ message: `KV Store set error: ${error}` });
+    }
+  }
+
+  async delete(key: string): Promise<void> {
+    try {
+      await redis.del(key);
+    } catch (error) {
+      Logger.error({ message: `KV Store delete error: ${error}` });
+    }
+  }
+}
+
+export const kv = new KVStore();
+```
+
+### Node-Cache Implementation (Development)
+
+```typescript
+// utils/kv-store.ts
+import NodeCache from 'node-cache';
+import { Logger } from './logger';
+
+const nodeCache = new NodeCache({
+  stdTTL: 3600,
+  checkperiod: 120,
+  useClones: false,
+});
+
+export class KVStore {
+  async get<T>(key: string): Promise<T | null> {
+    try {
+      const value = nodeCache.get<T>(key);
+      return value || null;
+    } catch (error) {
+      Logger.error({ message: `KV Store get error: ${error}` });
+      return null;
+    }
+  }
+
+  async set(key: string, value: any, expirySeconds?: number): Promise<void> {
+    try {
+      nodeCache.set(key, value, expirySeconds);
+    } catch (error) {
+      Logger.error({ message: `KV Store set error: ${error}` });
+    }
+  }
+
+  async delete(key: string): Promise<void> {
+    try {
+      nodeCache.del(key);
+    } catch (error) {
+      Logger.error({ message: `KV Store delete error: ${error}` });
+    }
+  }
+
+  async flush(): Promise<void> {
+    try {
+      nodeCache.flushAll();
+    } catch (error) {
+      Logger.error({ message: `KV Store flush error: ${error}` });
+    }
+  }
+
+  async getStats(): Promise<any> {
+    return nodeCache.getStats();
+  }
+}
+
+export const kv = new KVStore();
+```
+
+## Cache Usage Patterns
+
+### Customer Mapping Cache
+
+```typescript
+// Store customer mapping
+await kv.set(`stripe:user:${userId}`, stripeCustomerId);
+
+// Retrieve customer ID
+const customerId = await kv.get<string>(`stripe:user:${userId}`);
+```
+
+### Subscription Data Cache
+
+```typescript
+// Cache subscription data
+const subData: STRIPE_SUB_CACHE = {
+  subscriptionId: subscription.id,
+  status: subscription.status,
+  priceId: subscription.items.data[0].price.id,
+  currentPeriodEnd: subscription.current_period_end,
+  currentPeriodStart: subscription.current_period_start,
+  cancelAtPeriodEnd: subscription.cancel_at_period_end,
+  paymentMethod: {
+    brand: subscription.default_payment_method?.card?.brand ?? null,
+    last4: subscription.default_payment_method?.card?.last4 ?? null,
+  }
+};
+
+// Store with expiry
+const ttl = Math.floor((subscription.current_period_end - Date.now() / 1000) - 3600);
+await kv.set(`stripe:customer:${customerId}`, subData, ttl);
+```
+
+## Best Practices
+
+1. **Cache Duration**:
+   - Set appropriate TTL for cached data
+   - Consider subscription end dates
+   - Implement cache warming strategies
+
+2. **Error Handling**:
+   - Implement fallbacks for cache failures
+   - Log cache errors appropriately
+   - Handle race conditions
+
+3. **Cache Invalidation**:
+   - Clear cache on subscription updates
+   - Implement proper cache keys
+   - Use versioning if needed
+
+4. **Monitoring**:
+   - Track cache hit/miss rates
+   - Monitor memory usage
+   - Set up alerts for failures

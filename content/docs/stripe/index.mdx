@@ -1,0 +1,34 @@
+---
+title: Stripe Integration
+description: Learn how to implement Stripe payment processing for subscriptions and one-time payments
+---
+
+# Stripe Integration
+
+This guide covers the implementation of Stripe payment processing for subscription and one-time payments. The system supports:
+- Subscription-based payments with different plan tiers
+- One-time payments (e.g., VIP purchases)
+- Webhook handling for real-time payment updates
+- Database synchronization
+- Secure payment processing
+
+## Architecture
+
+```typescript
+project/
+├── src/
+│   ├── controllers/    # Payment handling logic
+│   ├── middleware/     # Stripe webhook verification
+│   ├── models/        # Database models
+│   └── utils/         # KV store and helpers
+└── .env              # Environment configuration
+```
+
+## In This Section
+
+- [Prerequisites and Setup](/docs/stripe/setup)
+- [Implementation Guide](/docs/stripe/implementation)
+- [Webhook Handling](/docs/stripe/webhooks)
+- [Database and Cache](/docs/stripe/storage)
+- [Testing and Deployment](/docs/stripe/deployment)
+- [Troubleshooting](/docs/stripe/troubleshooting)

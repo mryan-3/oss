@@ -1,0 +1,219 @@
+---
+title: Implementation Guide
+description: Step-by-step guide for implementing Stripe payment processing
+---
+
+# Implementation Guide
+
+## Express App Setup
+
+### Main App Configuration
+
+```typescript
+import express from 'express'
+import cors from 'cors'
+import { verifyStripeWebhook } from './middleware/stripe-webhook.middleware'
+import { handleWebhook } from './controllers/payment.controller'
+
+const app = express()
+
+// CORS configuration with stripe-signature header
+app.use(
+  cors({
+    origin: [process.env.FRONTEND_URL],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true,
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Origin',
+      'X-Requested-With',
+      'Accept',
+      'stripe-signature',
+    ],
+  })
+)
+
+// Standard middleware
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
+```
+
+### Payment Router Setup
+
+```typescript
+// router/v1/paymentGroup.ts
+import { Router } from 'express'
+import {
+  createCheckoutSession,
+  createVipCheckoutSession,
+  syncAfterSuccess,
+  handleWebhook,
+  getUserSubscriptionInfo
+} from '../../controllers/payment.controller'
+import { verifyStripeWebhook } from '../../middleware/stripe-webhook.middleware'
+
+const router = Router()
+
+// Standard payment endpoints
+router.post('/create-checkout-session', createCheckoutSession)
+router.post('/create-vip-checkout-session', createVipCheckoutSession)
+router.post('/sync', syncAfterSuccess)
+router.get('/:userId/subscription', getUserSubscriptionInfo)
+
+// Webhook endpoint with raw body parsing
+router.post(
+  '/webhook',
+  express.raw({ type: 'application/json' }),
+  verifyStripeWebhook,
+  handleWebhook
+)
+
+export default router
+```
+
+## API Endpoints
+
+### 1. Create Subscription Checkout
+
+```typescript
+// POST /api/v1/payments/create-checkout-session
+async function createCheckoutSession(req: Request, res: Response) {
+  try {
+    const { priceId, userId } = req.body
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      payment_method_types: ['card'],
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${process.env.FRONTEND_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL}/payment/canceled`,
+      metadata: { userId }
+    })
+
+    res.json({ url: session.url })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+}
+```
+
+### 2. Create VIP Purchase Checkout
+
+```typescript
+// POST /api/v1/payments/create-vip-checkout-session
+async function createVipCheckoutSession(req: Request, res: Response) {
+  try {
+    const { priceId, userId, vipOptionId } = req.body
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${process.env.FRONTEND_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL}/payment/canceled`,
+      metadata: { userId, vipOptionId }
+    })
+
+    res.json({ url: session.url })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+}
+```
+
+### 3. Sync Subscription Data
+
+```typescript
+// POST /api/v1/payments/sync
+async function syncAfterSuccess(req: Request, res: Response) {
+  try {
+    const { userId } = req.body
+    const customerId = await kv.get<string>(`stripe:user:${userId}`)
+    
+    if (!customerId) {
+      return res.status(404).json({ error: 'Customer not found' })
+    }
+
+    const subscription = await stripe.subscriptions.list({
+      customer: customerId,
+      limit: 1,
+      expand: ['data.default_payment_method']
+    })
+
+    const subData = subscription.data[0]
+    await updateSubscriptionCache(customerId, subData)
+    
+    res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+}
+```
+
+## Client-Side Integration
+
+### 1. Initialize Stripe
+
+```typescript
+// utils/stripe.ts
+import { loadStripe } from '@stripe/stripe-js'
+
+export const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+```
+
+### 2. Create Checkout Component
+
+```typescript
+// components/CheckoutButton.tsx
+'use client'
+
+import { useRouter } from 'next/navigation'
+import { stripePromise } from '@/utils/stripe'
+
+export function CheckoutButton({ priceId, userId }: { priceId: string; userId: string }) {
+  const router = useRouter()
+
+  const handleCheckout = async () => {
+    try {
+      const response = await fetch('/api/v1/payments/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceId, userId })
+      })
+
+      const { url } = await response.json()
+      router.push(url)
+    } catch (error) {
+      console.error('Checkout error:', error)
+    }
+  }
+
+  return (
+    <button onClick={handleCheckout} className="btn btn-primary">
+      Subscribe Now
+    </button>
+  )
+}
+```
+
+## Key Implementation Notes
+
+1. **Route Order**:
+   - Webhook route with `express.raw()` must be defined after `express.json()`
+   - Only apply raw parsing to the webhook route
+
+2. **Security**:
+   - Always verify webhook signatures
+   - Include `stripe-signature` in CORS headers
+   - Use HTTPS in production
+
+3. **Error Handling**:
+   - Implement proper error handling for all endpoints
+   - Log errors appropriately
+   - Return meaningful error messages
+
+4. **Data Synchronization**:
+   - Keep database and cache in sync
+   - Handle edge cases in webhook processing
+   - Implement retry mechanisms for failed operations

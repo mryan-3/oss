@@ -101,6 +101,18 @@ const OSSProjects = [
                 minutes.
             </>
         )
+    },
+    {
+        title: 'Strip Integration',
+        image: '/stripe.png',
+        link: '/docs/stripe/',
+        description: (
+            <>
+                Simple documentation to help you integrate Stripe into your application.
+                With great documentation and support, you can get started in
+                minutes.
+            </>
+        )
     }
 ]
 

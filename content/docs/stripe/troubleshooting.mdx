@@ -1,0 +1,167 @@
+---
+title: Troubleshooting
+description: Common issues and solutions for Stripe integration
+---
+
+# Troubleshooting
+
+## Common Issues
+
+### Webhook Signature Verification Failed
+
+```
+Error: "Webhook signature verification failed"
+```
+
+**Solutions:**
+1. Check webhook secret matches your environment variable
+2. Verify body parsing configuration:
+   ```typescript
+   router.post(
+     '/webhook',
+     express.raw({ type: 'application/json' }), // Must be first
+     verifyStripeWebhook,
+     handleWebhook
+   )
+   ```
+3. Ensure no middleware modifies the request body before verification
+4. Verify `stripe-signature` header in CORS configuration
+
+### Payment Not Recorded
+
+```
+Webhook received but payment not processed
+```
+
+**Solutions:**
+1. Check webhook logs in your application
+2. Verify event type is in allowedEvents array
+3. Check database connection status
+4. Verify customer ID mapping in KV store
+5. Check webhook handler function for errors
+
+### Subscription Status Not Updated
+
+```
+Webhook processed but subscription status unchanged
+```
+
+**Solutions:**
+1. Check KV store connection and operations
+2. Verify webhook delivery in Stripe Dashboard
+3. Review subscription event handling logic
+4. Check database write permissions
+5. Validate subscription data format
+
+### CORS Issues
+
+```
+Error: "CORS policy blocked the request"
+```
+
+**Solutions:**
+1. Update CORS configuration:
+   ```typescript
+   app.use(cors({
+     origin: [process.env.FRONTEND_URL],
+     methods: ['POST'],
+     allowedHeaders: [
+       'Content-Type',
+       'stripe-signature'
+     ]
+   }))
+   ```
+2. Verify webhook endpoint allows POST method
+3. Check OPTIONS request handling
+
+## Development vs Production Issues
+
+### Local Development
+
+1. Use Stripe CLI for webhook testing:
+   ```bash
+   stripe listen --forward-to localhost:8001/api/v1/payments/webhook
+   ```
+
+2. Test webhooks with CLI:
+   ```bash
+   stripe trigger payment_intent.succeeded
+   stripe trigger customer.subscription.created
+   ```
+
+3. Common local issues:
+   - Webhook secret mismatch
+   - Server not accessible
+   - Wrong environment variables
+
+### Production Environment
+
+1. Configuration checks:
+   - HTTPS enabled
+   - Valid SSL certificate
+   - Correct webhook endpoint URL
+   - Production API keys
+
+2. Monitoring:
+   - Check Stripe Dashboard logs
+   - Monitor application error logs
+   - Track webhook delivery status
+
+## Debugging Steps
+
+### 1. Server Logs
+
+Check for webhook-related errors:
+```bash
+grep -i "webhook\|stripe" server.log
+```
+
+### 2. Webhook Verification
+
+Add debug logging:
+```typescript
+console.log('Webhook signature:', req.headers['stripe-signature'])
+console.log('Raw body type:', typeof req.body)
+console.log('Raw body length:', req.body?.length)
+```
+
+### 3. Event Processing
+
+Monitor webhook events:
+```typescript
+// Add to webhook handler
+console.log('Event type:', event.type)
+console.log('Event data:', JSON.stringify(event.data.object))
+```
+
+### 4. Cache Operations
+
+Debug cache operations:
+```typescript
+// Add to KV store operations
+console.log('Cache operation:', operation)
+console.log('Cache key:', key)
+console.log('Cache result:', result)
+```
+
+## Quick Resolution Guide
+
+1. **Payment Processing Issues**
+   - Check Stripe Dashboard for transaction status
+   - Verify webhook delivery
+   - Check payment intent status
+
+2. **Subscription Problems**
+   - Verify subscription status in Stripe
+   - Check webhook events sequence
+   - Review cache and database state
+
+3. **Integration Errors**
+   - Validate API keys
+   - Check endpoint configurations
+   - Review CORS settings
+
+4. **Data Synchronization**
+   - Check database consistency
+   - Verify cache state
+   - Review webhook processing logs

@@ -1,0 +1,207 @@
+---
+title: Webhook Handling
+description: Guide for implementing and managing Stripe webhooks
+---
+
+# Webhook Handling
+
+## Webhook Events
+
+The following events should be monitored for proper payment and subscription handling:
+
+```typescript
+const allowedEvents = [
+  "checkout.session.completed",
+  "customer.subscription.created",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
+  "customer.subscription.paused",
+  "customer.subscription.resumed",
+  "customer.subscription.trial_will_end",
+  "invoice.paid",
+  "invoice.payment_failed",
+  "invoice.payment_action_required",
+  "invoice.upcoming",
+  "payment_intent.succeeded",
+  "payment_intent.payment_failed",
+  "payment_intent.canceled"
+]
+```
+
+## Webhook Middleware Implementation
+
+### Signature Verification
+
+```typescript
+// middleware/stripe-webhook.middleware.ts
+import { Request, Response, NextFunction } from 'express'
+import { stripe } from '../utils/stripe'
+import { Logger } from './logger'
+
+export const verifyStripeWebhook = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const signature = req.headers['stripe-signature']
+    
+    if (!signature) {
+      Logger.error({ message: 'Missing Stripe signature' })
+      return res.status(400).send('Missing Stripe signature')
+    }
+    
+    const rawBody = req.body
+    
+    if (!rawBody) {
+      Logger.error({ message: 'Missing raw body for verification' })
+      return res.status(400).send('Missing raw body')
+    }
+    
+    req.body = stripe.webhooks.constructEvent(
+      rawBody,
+      signature as string,
+      process.env.STRIPE_WEBHOOK_SECRET!
+    )
+    
+    next()
+  } catch (err: any) {
+    Logger.error({ message: `Webhook verification failed: ${err.message}` })
+    return res.status(400).send(`Webhook verification failed: ${err.message}`)
+  }
+}
+```
+
+## Event Handler Implementation
+
+```typescript
+// controllers/payment.controller.ts
+async function handleWebhook(req: Request, res: Response) {
+  const event = req.body
+
+  try {
+    switch (event.type) {
+      case 'checkout.session.completed':
+        await handleCheckoutComplete(event.data.object)
+        break
+
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated':
+        await handleSubscriptionUpdate(event.data.object)
+        break
+
+      case 'customer.subscription.deleted':
+        await handleSubscriptionCanceled(event.data.object)
+        break
+
+      case 'invoice.payment_failed':
+        await handlePaymentFailed(event.data.object)
+        break
+
+      // Add handlers for other events...
+
+      default:
+        console.log(`Unhandled event type: ${event.type}`)
+    }
+
+    res.json({ received: true })
+  } catch (error) {
+    Logger.error({ message: `Webhook handler error: ${error.message}` })
+    res.status(500).json({ error: 'Webhook handler failed' })
+  }
+}
+```
+
+## Event Handler Functions
+
+### Checkout Complete Handler
+
+```typescript
+async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
+  const { userId } = session.metadata
+  const customerId = session.customer as string
+
+  // Store customer mapping
+  await kv.set(`stripe:user:${userId}`, customerId)
+
+  if (session.mode === 'subscription') {
+    // Handle subscription checkout
+    const subscription = await stripe.subscriptions.retrieve(
+      session.subscription as string
+    )
+    await handleSubscriptionUpdate(subscription)
+  } else {
+    // Handle one-time payment
+    await handleOneTimePayment(session)
+  }
+}
+```
+
+### Subscription Update Handler
+
+```typescript
+async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
+  const customerId = subscription.customer as string
+  
+  const subData = {
+    subscriptionId: subscription.id,
+    status: subscription.status,
+    priceId: subscription.items.data[0].price.id,
+    currentPeriodEnd: subscription.current_period_end,
+    currentPeriodStart: subscription.current_period_start,
+    cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    paymentMethod: subscription.default_payment_method
+      ? {
+          brand: subscription.default_payment_method.card?.brand,
+          last4: subscription.default_payment_method.card?.last4,
+        }
+      : null
+  }
+
+  await kv.set(`stripe:customer:${customerId}`, subData)
+}
+```
+
+## Testing Webhooks
+
+### Local Testing
+
+1. Start webhook forwarding:
+```bash
+stripe listen --forward-to localhost:8001/api/v1/payments/webhook
+```
+
+2. Trigger test events:
+```bash
+stripe trigger payment_intent.succeeded
+stripe trigger customer.subscription.created
+```
+
+### Production Testing
+
+1. Use Stripe Dashboard to:
+   - Monitor webhook delivery attempts
+   - View webhook logs
+   - Replay failed webhooks
+
+2. Monitor your application logs for:
+   - Signature verification failures
+   - Event processing errors
+   - Database/cache update issues
+
+## Common Webhook Issues
+
+1. **Signature Verification Failures**:
+   - Check webhook secret is correct
+   - Verify raw body parsing is working
+   - Ensure no body modification before verification
+
+2. **Missing Events**:
+   - Verify event types are selected in Dashboard
+   - Check webhook endpoint is accessible
+   - Monitor application logs for errors
+
+3. **Data Synchronization**:
+   - Implement idempotency checks
+   - Use database transactions
+   - Handle race conditions properly

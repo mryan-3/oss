@@ -1,0 +1,90 @@
+---
+title: Prerequisites and Setup
+description: Initial setup and requirements for Stripe integration
+---
+
+# Prerequisites and Setup
+
+## Stripe Account Setup
+
+1. Create a Stripe account at [stripe.com](https://stripe.com)
+2. Navigate to the Stripe Dashboard
+3. Get your API keys from Developers → API Keys
+4. Set up your products and price plans in Products → Add Product
+
+## Environment Configuration
+
+Create a `.env` file with the following variables:
+
+```env
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+FRONTEND_URL=http://localhost:3000
+```
+
+## Local Development Setup
+
+1. Install Stripe CLI:
+
+```bash
+# For macOS
+brew install stripe/stripe-cli/stripe
+
+# For Windows (using scoop)
+scoop install stripe
+
+# For Linux
+curl -s https://packages.stripe.dev/api/security/keypair/stripe-cli-gpg/public | gpg --dearmor | sudo tee /usr/share/keyrings/stripe.gpg
+echo "deb [signed-by=/usr/share/keyrings/stripe.gpg] https://packages.stripe.dev/stripe-cli-debian-local stable main" | sudo tee -a /etc/apt/sources.list.d/stripe.list
+sudo apt update
+sudo apt install stripe
+```
+
+2. Log in to Stripe CLI:
+```bash
+stripe login
+```
+
+3. Start webhook forwarding for local development:
+```bash
+stripe listen --forward-to localhost:8001/api/v1/payments/webhook
+```
+
+## Production Setup
+
+1. Configure webhook endpoint in Stripe Dashboard:
+   - Navigate to Developers → Webhooks
+   - Add endpoint URL: `https://your-domain.com/api/v1/payments/webhook`
+   - Select events to monitor (see [Webhook Events](/stripe/webhooks))
+   - Save the webhook signing secret
+
+2. Update environment variables for production:
+   - Use production Stripe API keys
+   - Set proper FRONTEND_URL
+   - Configure production webhook secret
+
+## Required Dependencies
+
+Install the necessary packages:
+
+```bash
+npm install stripe @stripe/stripe-js express-validator
+```
+
+## Security Best Practices
+
+1. **API Keys**:
+   - Never commit API keys to version control
+   - Use different keys for development and production
+   - Rotate keys periodically
+
+2. **Webhook Security**:
+   - Always verify webhook signatures
+   - Use HTTPS in production
+   - Implement proper error handling
+
+3. **Data Protection**:
+   - Implement proper access controls
+   - Encrypt sensitive data
+   - Follow PCI compliance guidelines if storing card data
