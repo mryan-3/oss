@@ -1,13 +1,17 @@
 ---
 title: Using the SDK
-description: Using the SDK is simple and straightforward. Get it working in minutes!
+description:
+    Using the SDK is simple and straightforward. Get it working in minutes!
 ---
 
 ### Initialize the SDK
-Use the `Mpesa` class to initialize the SDK with your credentials. You SHOULD store your credentials in a `.env` file and use `dotenv` to load them into your application.
+
+Use the `Mpesa` class to initialize the SDK with your credentials. You SHOULD
+store your credentials in a `.env` file and use `dotenv` to load them into your
+application.
 
 ```typescript title="index.ts"
-import { Mpesa } from '@zenetralabs/mpesa'
+import { Mpesa } from '@zenetralabs/mpesa';
 
 export const mpesa = new Mpesa({
     env: 'sandbox', // "sandbox" or "live"
@@ -20,7 +24,7 @@ export const mpesa = new Mpesa({
     password: 'PASSWORD',
     certFolderPath: 'CERT_FOLDER_ABSOLUTE_PATH',
     passkey: 'MPESA_PASSKEY'
-})
+});
 
 // STK Push code
 // B2C code
@@ -30,11 +34,13 @@ export const mpesa = new Mpesa({
 
 ### STK Push
 
-STK Push is a service that allows you to receive payments on the go from your customers. It is a simple and secure way to receive payments from customers using M-Pesa. The service is available on the
-Paybill and Buy Goods and Services platforms.
+STK Push is a service that allows you to receive payments on the go from your
+customers. It is a simple and secure way to receive payments from customers
+using M-Pesa. The service is available on the Paybill and Buy Goods and Services
+platforms.
 
 ```typescript title="stk-push.ts"
-import { Mpesa } from '@zenetralabs/mpesa'
+import { Mpesa } from '@zenetralabs/mpesa';
 
 // mpesa Config setup here
 
@@ -44,15 +50,16 @@ const { error, data } = await mpesa.stkPush({
     amount: 400,
     CallBackURL: `https://todo.com/api/v1/pay/stk/callback`, // Must be https secure
     description: `Description of this payment`
-})
+});
 ```
 
 ### B2C
 
-B2C is a service that allows you to send money to any mpesa mobile number in Kenya.
+B2C is a service that allows you to send money to any mpesa mobile number in
+Kenya.
 
 ```typescript title="b2c.ts"
-import { Mpesa } from '@zenetralabs/mpesa'
+import { Mpesa } from '@zenetralabs/mpesa';
 
 // mpesa Config setup here
 
@@ -64,15 +71,16 @@ const { data, error } = await mpesa.sendB2C({
     Remarks: `Some remarks here`,
     ResultURL: `https://todo.com/api/v1/pay/b2c/callback`,
     QueueTimeOutURL: `https://todo.com/api/v1/pay/b2c/timeout`
-})
+});
 ```
 
 ### Check Transaction Status
 
-Check the status of a transaction using the `TransactionID` returned from the `B2C` or `STK Push` request.
+Check the status of a transaction using the `TransactionID` returned from the
+`B2C` or `STK Push` request.
 
 ```typescript title="transaction-status.ts"
-import { Mpesa } from '@zenetralabs/mpesa'
+import { Mpesa } from '@zenetralabs/mpesa';
 
 // mpesa Config setup here
 
@@ -80,7 +88,7 @@ const { data, error } = await mpesa.checkStatus({
     code: 'SJDK98K8H',
     QueueTimeOutURL: `https://todo.com/api/v1/pay/status/timeout`,
     ResultURL: `https://todo.com/api/v1/pay/status/callback`
-})
+});
 ```
 
 ### Check mpesa business accounts Balance
@@ -88,12 +96,12 @@ const { data, error } = await mpesa.checkStatus({
 Check the balance of your business account
 
 ```typescript title="balance.ts"
-import { Mpesa } from '@zenetralabs/mpesa'
+import { Mpesa } from '@zenetralabs/mpesa';
 
 // mpesa Config setup here
 
 const { data, error } = await mpesa.accountBalance({
     QueueTimeOutURL: `https://todo.com/api/v1/pay/balance/timeout`,
     ResultURL: `https://todo.com/api/v1/pay/balance/callback`
-})
+});
 ```

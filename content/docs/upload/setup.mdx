@@ -1,0 +1,57 @@
+---
+title: Setup and Prerequisites
+description: Required dependencies and environment setup for UploadThing integration
+---
+
+# Setup and Prerequisites
+
+## Required Dependencies
+
+### Server Dependencies
+
+```json
+{
+  "uploadthing": "^7.7.2"
+}
+```
+
+### Client Dependencies
+
+```json
+{
+  "@uploadthing/react": "^7.3.1",
+  "uploadthing": "^7.7.2"
+}
+```
+
+## Environment Variables
+
+### Server Configuration (.env)
+
+```env
+UPLOADTHING_TOKEN=your_uploadthing_token
+CALLBACK_URL=http://localhost:8001/api/uploadthing
+```
+
+### Client Configuration (.env.local)
+
+```env
+NEXT_PUBLIC_SERVER_URL=http://localhost:8001
+```
+
+## Initial Setup Steps
+
+1. Install the required dependencies:
+   ```bash
+   # In the server directory
+   npm install uploadthing
+
+   # In the client directory
+   npm install @uploadthing/react uploadthing
+   ```
+
+2. Set up your environment variables as shown above
+
+3. Configure CORS on your server to accept requests from your frontend
+
+4. Create your UploadThing account and get your API token from the dashboard

@@ -3,5 +3,5 @@
     "description": "Easily integrate Mpesa",
     "icon": "Building2",
     "root": false,
-    "pages": ["---Guide---", "intro", "setup", "usage"]
+    "pages": ["intro", "setup", "callbacks", "usage"]
 }

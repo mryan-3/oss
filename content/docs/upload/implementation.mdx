@@ -1,0 +1,122 @@
+---
+title: Implementation Guide
+description: Step-by-step guide for implementing UploadThing in your application
+---
+
+# Implementation Guide
+
+## Server-Side Setup
+
+### 1. Create Upload Router
+
+Create `server/router/v1/upload-thing.ts`:
+
+```typescript
+import { createUploadthing, type FileRouter } from 'uploadthing/express'
+
+const f = createUploadthing()
+
+export const uploadRouter = {
+  // Image upload endpoint
+  imageUploader: f({
+    image: {
+      maxFileSize: '4MB',
+      maxFileCount: 5,
+    },
+  })
+    .middleware(async ({ req }) => {
+      return {}; // metadata to pass to onUploadComplete
+    })
+    .onUploadComplete(async ({ file }) => {
+      return {
+        url: file.ufsUrl,
+        key: file.key,
+        name: file.name
+      }
+    }),
+
+  // PDF upload endpoint
+  documentUploader: f({
+    pdf: {
+      maxFileSize: '16MB',
+      maxFileCount: 1,
+    },
+  })
+    .middleware(async () => ({ }))
+    .onUploadComplete(async ({ file }) => {
+      return {
+        url: file.ufsUrl,
+        key: file.key,
+        name: file.name
+      }
+    }),
+} satisfies FileRouter
+
+export type OurFileRouter = typeof uploadRouter
+```
+
+### 2. Setup Express Route Handler
+
+```typescript
+import express from 'express'
+import { createRouteHandler } from 'uploadthing/express'
+import { uploadRouter } from './router/v1/upload-thing'
+
+const app = express()
+
+app.use(
+  '/api/uploadthing',
+  createRouteHandler({
+    router: uploadRouter,
+    config: {
+      token: process.env.UPLOADTHING_TOKEN!,
+      callbackUrl: process.env.CALLBACK_URL!,
+    },
+  })
+)
+```
+
+## Client-Side Setup
+
+### 1. Create UploadThing Client
+
+Create `client/src/lib/uploadthing.ts`:
+
+```typescript
+import { generateReactHelpers } from "@uploadthing/react";
+
+export const { useUploadThing, uploadFiles } = generateReactHelpers({
+  url: process.env.NEXT_PUBLIC_SERVER_URL + "/api/uploadthing",
+});
+```
+
+### 2. Basic Usage Component
+
+```tsx
+'use client'
+
+import { useUploadThing } from '@/lib/uploadthing'
+
+export function UploadComponent() {
+  const { startUpload, isUploading } = useUploadThing("imageUploader", {
+    onClientUploadComplete: (res) => {
+      console.log("Upload completed:", res);
+    },
+    onUploadError: (error) => {
+      console.error("Upload error:", error);
+    },
+  });
+
+  return (
+    <div>
+      <input
+        type="file"
+        onChange={(e) => {
+          const files = e.target.files
+          if (files) startUpload(Array.from(files))
+        }}
+      />
+      {isUploading && <p>Uploading...</p>}
+    </div>
+  );
+}

@@ -1,0 +1,400 @@
+---
+title: Setting Up M-Pesa Callbacks
+description:
+    Learn how to properly set up and handle M-Pesa callbacks in your application
+---
+
+## Understanding M-Pesa Callbacks
+
+When you initiate transactions with M-Pesa (such as STK Push, B2C transfers, or
+balance checks), M-Pesa sends asynchronous notifications to your application
+through callback URLs. Setting up these callbacks correctly is essential for
+proper transaction tracking and handling.
+
+<Callout title="Important">
+    All callback URLs must be publicly accessible HTTPS endpoints. M-Pesa will
+    not send callbacks to localhost or HTTP URLs.
+</Callout>
+
+## Types of Callbacks
+
+The M-Pesa API provides several types of callbacks, each serving a different
+purpose:
+
+### 1. STK Push Callback
+
+Receives notification when an STK Push request completes (successful payment or
+failure).
+
+### 2. B2C Callback
+
+Notifies your application when a Business-to-Customer transfer completes.
+
+### 3. Transaction Status Callback
+
+Provides status updates for transaction queries.
+
+### 4. Account Balance Callback
+
+Returns the result of an account balance query.
+
+### 5. Timeout Callbacks
+
+For each operation above, there's a corresponding timeout callback that gets
+triggered if the original request times out.
+
+## Implementing Callbacks
+
+Below are examples of how to implement each callback type using Express.js:
+
+<Callout title="Note">
+    Assuming we have a `Transaction` model/table to store transaction details
+    and a `Balance` model to store account balance information. Ensure you have
+    the necessary models/tables and database setup in place. Example is using
+    MongoDB with Mongoose. Adjust the code as per your database and ORM/ODM.
+</Callout>
+
+### STK Push Callback
+
+```typescript title="callback.ts"
+import { Request, Response } from 'express';
+import Transaction from '../models/transactions.model';
+
+// @route POST /api/v1/pay/stk/callback
+export const stkCallback = async (req: Request, res: Response) => {
+    try {
+        const {
+            Body: { stkCallback }
+        } = req.body;
+
+        console.log('STK Callback received');
+
+        // Find transaction using the MerchantRequestID
+        let transaction = await Transaction.findOne({
+            'mpesaInit.MerchantRequestID': stkCallback.MerchantRequestID
+        });
+
+        if (!transaction) {
+            console.error(
+                `${stkCallback.MerchantRequestID} Transaction not found`
+            );
+            return res.status(200).json({
+                message: 'Callback received successfully!'
+            });
+        }
+
+        // Check if mpesa transaction was successful (ResultCode 0 means success)
+        if (stkCallback.ResultCode == 0) {
+            // Update transaction status
+            transaction.status = 'completed';
+            transaction.mpesaCode = stkCallback.CallbackMetadata.Item[1].Value;
+
+            // Extract phone number from callback metadata
+            transaction.phoneNumber = stkCallback.CallbackMetadata.Item.filter(
+                (item: any) => item.Name === 'PhoneNumber'
+            )[0].Value;
+
+            // Process successful payment logic here
+            // ...
+
+            await transaction.save();
+        } else {
+            // Handle failed transaction
+            transaction.status = 'failed';
+            transaction.reasonForFailure =
+                'mpesa_transaction_cancelled_or_failed';
+
+            await transaction.save();
+        }
+
+        // Always return a 200 status to acknowledge receipt
+        return res.status(200).json({
+            message: 'Callback received successfully!'
+        });
+    } catch (err: any) {
+        console.error(`STK Callback error: ${err.message}`);
+
+        // Always acknowledge receipt to M-Pesa
+        return res.status(200).json({
+            message: 'Callback received'
+        });
+    }
+};
+```
+
+### B2C Callback
+
+```typescript title="callback.ts"
+import { Request, Response } from 'express';
+import Transaction from '../models/transactions.model';
+
+// @route POST /api/v1/pay/b2c/callback
+export const b2cCallback = async (req: Request, res: Response) => {
+    try {
+        const { Result } = req.body;
+
+        const {
+            ResultCode, // 0 == success
+            ResultDesc, // Description of the result
+            OriginatorConversationID, // ID used to find your transaction
+            TransactionID // M-Pesa transaction ID
+        } = Result;
+
+        // Find transaction
+        let transaction = await Transaction.findOne({
+            'mpesaInit.MerchantRequestID': OriginatorConversationID
+        });
+
+        if (!transaction) {
+            console.error(`${OriginatorConversationID} Transaction not found`);
+            return res.status(200).json({
+                message: 'Callback received successfully!'
+            });
+        }
+
+        if (ResultCode == 0) {
+            // Success case
+            const { ResultParameters } = Result;
+
+            transaction.mpesaCode = TransactionID;
+            transaction.status = 'completed';
+            transaction.responseDescription = ResultDesc;
+
+            // Additional processing for successful B2C transfer
+            // ...
+
+            await transaction.save();
+        } else {
+            // Failure case
+            transaction.status = 'failed';
+            transaction.responseDescription = ResultDesc;
+            transaction.reasonForFailure = 'b2c_transfer_failed';
+
+            await transaction.save();
+        }
+
+        return res.status(200).json({
+            message: 'Payment processed successfully'
+        });
+    } catch (err: any) {
+        console.error(`B2C Callback error: ${err.message}`);
+
+        // Always return 200 to acknowledge
+        return res.status(200).json({
+            message: 'Callback received'
+        });
+    }
+};
+```
+
+### Transaction Status Callback
+
+```typescript title="callback.ts"
+import { Request, Response } from 'express';
+import TransactionStatus from '../models/transactionStatus.model';
+
+// @route POST /api/v1/pay/status/callback
+export const statusCallback = async (req: Request, res: Response) => {
+    try {
+        const { Result } = req.body;
+        const { OriginatorConversationID, ResultCode } = Result;
+
+        const statusCheck = await TransactionStatus.findOne({
+            OriginatorConversationID
+        });
+
+        if (statusCheck) {
+            statusCheck.status = ResultCode == 0 ? 'completed' : 'failed';
+            statusCheck.processed = true;
+
+            await statusCheck.save();
+        }
+
+        return res.status(200).json({
+            message: 'Payment status checked successfully'
+        });
+    } catch (err: any) {
+        console.error(`Status Callback error: ${err.message}`);
+
+        return res.status(200).json({
+            message: 'Callback received'
+        });
+    }
+};
+```
+
+### Account Balance Callback
+
+```typescript title="callback.ts"
+import { Request, Response } from 'express';
+import Balance from '../models/balance.model';
+
+// @route POST /api/v1/pay/balance/callback
+export const balanceCallback = async (req: Request, res: Response) => {
+    try {
+        const { Result } = req.body;
+
+        const {
+            ResultCode,
+            ResultParameters: { ResultParameter },
+            OriginatorConversationID
+        } = Result;
+
+        if (ResultCode == 0) {
+            // Extract account balance
+            let balances = ResultParameter.filter(
+                (item: any) => item.Key === 'AccountBalance'
+            );
+
+            // Store the balance in your database
+            await Balance.findOneAndUpdate(
+                {},
+                { mpesa: balances[0].Value },
+                { upsert: true }
+            );
+
+            // You can parse the balance string into a more structured format
+            // const parsedBalance = parseAccountBalance(balances[0].Value);
+        }
+
+        console.log(
+            `Balance check received with ID: ${OriginatorConversationID}`
+        );
+
+        return res.status(200).json({
+            message: 'Balance check received successfully'
+        });
+    } catch (err: any) {
+        console.error(`Balance Callback error: ${err.message}`);
+
+        return res.status(200).json({
+            message: 'Callback received'
+        });
+    }
+};
+```
+
+## Handling Timeout Callbacks
+
+Each operation has a corresponding timeout callback that gets triggered if
+M-Pesa doesn't receive a response from its systems within the expected time
+frame.
+
+```typescript title="callback.ts"
+// @route POST /api/v1/pay/b2c/timeout
+export const b2cTimeout = async (req: Request, res: Response) => {
+    try {
+        const { Result } = req.body;
+        const { OriginatorConversationID } = Result;
+
+        // Find and update transaction
+        let transaction = await Transaction.findOne({
+            'mpesaInit.MerchantRequestID': OriginatorConversationID
+        });
+
+        if (transaction) {
+            transaction.status = 'failed';
+            transaction.reasonForFailure = 'request_timeout';
+
+            await transaction.save();
+        }
+
+        console.log(`B2C request timed out: ${OriginatorConversationID}`);
+
+        return res.status(200).json({
+            message: 'Timeout received successfully!'
+        });
+    } catch (err: any) {
+        console.error(`B2C Timeout error: ${err.message}`);
+
+        return res.status(200).json({
+            message: 'Timeout received'
+        });
+    }
+};
+```
+
+## Setting Up Routes in Express
+
+To make your callbacks accessible, set up the corresponding routes in your
+Express application:
+
+```typescript title="callback.ts"
+import express from 'express';
+import {
+    stkCallback,
+    b2cCallback,
+    b2cTimeout,
+    statusCallback,
+    statusTimeout,
+    balanceCallback,
+    balanceTimeout
+} from './controllers/mpesaCallbacks';
+
+const router = express.Router();
+
+// STK Push callback
+router.post('/api/v1/pay/stk/callback', stkCallback);
+
+// B2C callbacks
+router.post('/api/v1/pay/b2c/callback', b2cCallback);
+router.post('/api/v1/pay/b2c/timeout', b2cTimeout);
+
+// Transaction status callbacks
+router.post('/api/v1/pay/status/callback', statusCallback);
+router.post('/api/v1/pay/status/timeout', statusTimeout);
+
+// Account balance callbacks
+router.post('/api/v1/pay/balance/callback', balanceCallback);
+router.post('/api/v1/pay/balance/timeout', balanceTimeout);
+
+export default router;
+```
+
+## Best Practices
+
+<Callout title="Best Practices">
+1. **Always return HTTP 200**: M-Pesa expects a 200 OK response for all callbacks, even if you encounter errors in your processing logic.
+
+2. **Idempotency**: Ensure your callback handlers are idempotent as M-Pesa may
+   send the same callback multiple times.
+
+3. **Error Handling**: Implement robust error handling in your callback
+   functions.
+
+4. **Logging**: Log all callbacks received for debugging and audit purposes.
+
+5. **Secure Endpoints**: Validate that callbacks are genuinely from M-Pesa
+   (though M-Pesa doesn't currently provide a validation mechanism).
+
+6. **Timeout Handling**: Always implement timeout callback endpoints for each
+   operation to handle potential timeouts.
+
+</Callout>
+
+## Testing Callbacks
+
+During development, you can use tools like [ngrok](https://ngrok.com/) to expose
+your local server to the internet, making it accessible for M-Pesa's sandbox
+callbacks:
+
+```bash
+# Example using ngrok to expose local port 3000
+ngrok http 3000
+```
+
+Use the provided HTTPS URL as your callback endpoint in sandbox testing.
+
+## Troubleshooting
+
+If you're not receiving callbacks:
+
+1. **Check URL Accessibility**: Ensure your callback URLs are publicly
+   accessible.
+2. **Verify HTTPS**: M-Pesa only sends callbacks to HTTPS endpoints.
+3. **Review Logs**: Check your server logs for any errors in processing
+   callbacks.
+4. **Test Endpoints**: Use a tool like Postman to test your callback endpoints
+   with sample data.
+5. **Confirm Request Structure**: Verify that your request to M-Pesa included
+   the correct callback URLs.

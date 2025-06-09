@@ -89,6 +89,18 @@ const OSSProjects = [
                 minutes.
             </>
         )
+    },
+    {
+        title: 'Uploadthing Integration',
+        image: '/upload.png',
+        link: '/docs/upload/',
+        description: (
+            <>
+                Simple documentation to help you integrate Uploadthing into your application.
+                With great documentation and support, you can get started in
+                minutes.
+            </>
+        )
     }
 ]
 

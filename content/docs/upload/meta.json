@@ -1,0 +1,10 @@
+{
+  "title": "File Upload",
+  "pages": [
+    "index",
+    "setup",
+    "implementation",
+    "advanced",
+    "troubleshooting"
+  ]
+}

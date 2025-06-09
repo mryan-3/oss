@@ -1,0 +1,191 @@
+---
+title: Advanced Patterns
+description: Advanced implementation patterns for UploadThing integration
+---
+
+# Advanced Patterns
+
+## Image Processing with React-Image-Crop
+
+```tsx
+'use client'
+
+import { useState, useRef } from 'react'
+import ReactCrop, { Crop } from 'react-image-crop'
+import 'react-image-crop/dist/ReactCrop.css'
+import { uploadProcessedFile } from '@/lib/upload'
+
+export function ImageCropUpload() {
+  const [src, setSrc] = useState<string>()
+  const [crop, setCrop] = useState<Crop>()
+  const imgRef = useRef<HTMLImageElement>(null)
+
+  const getCroppedImg = async (): Promise<File> => {
+    if (!imgRef.current || !crop) throw new Error('No image or crop data')
+
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')!
+
+    const scaleX = imgRef.current.naturalWidth / imgRef.current.width
+    const scaleY = imgRef.current.naturalHeight / imgRef.current.height
+
+    canvas.width = crop.width * scaleX
+    canvas.height = crop.height * scaleY
+
+    ctx.drawImage(
+      imgRef.current,
+      crop.x * scaleX,
+      crop.y * scaleY,
+      crop.width * scaleX,
+      crop.height * scaleY,
+      0,
+      0,
+      crop.width * scaleX,
+      crop.height * scaleY
+    )
+
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        if (!blob) throw new Error('Failed to create blob')
+        resolve(new File([blob], 'cropped.jpg', { type: 'image/jpeg' }))
+      }, 'image/jpeg', 0.9)
+    })
+  }
+
+  return (
+    <div className="space-y-4">
+      <input
+        type="file"
+        accept="image/*"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) {
+            const reader = new FileReader()
+            reader.onload = () => setSrc(reader.result as string)
+            reader.readAsDataURL(file)
+          }
+        }}
+      />
+
+      {src && (
+        <ReactCrop crop={crop} onChange={setCrop} aspect={1}>
+          <img ref={imgRef} src={src} alt="Crop preview" />
+        </ReactCrop>
+      )}
+
+      <button
+        onClick={async () => {
+          try {
+            const croppedFile = await getCroppedImg()
+            const result = await uploadProcessedFile('imageUploader', croppedFile)
+            console.log('Uploaded:', result)
+          } catch (error) {
+            console.error('Upload failed:', error)
+          }
+        }}
+        disabled={!crop}
+      >
+        Upload Cropped Image
+      </button>
+    </div>
+  )
+}
+```
+
+## Progress Tracking Component
+
+```tsx
+'use client'
+
+interface UploadProgressProps {
+  progress: number;
+  fileName: string;
+  status: 'uploading' | 'completed' | 'error';
+  error?: string;
+}
+
+export function UploadProgress({
+  progress,
+  fileName,
+  status,
+  error
+}: UploadProgressProps) {
+  return (
+    <div className="border p-4 rounded">
+      <div className="flex justify-between items-center">
+        <span>{fileName}</span>
+        <span className="text-sm">
+          {status === 'uploading' ? `${progress}%` : status}
+        </span>
+      </div>
+
+      <div className="mt-2">
+        <div className="w-full bg-gray-200 rounded-full h-2">
+          <div
+            className={`h-2 rounded-full ${
+              status === 'error'
+                ? 'bg-red-600'
+                : status === 'completed'
+                ? 'bg-green-600'
+                : 'bg-blue-600'
+            }`}
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+
+      {error && (
+        <p className="mt-2 text-sm text-red-600">{error}</p>
+      )}
+    </div>
+  )
+}
+```
+
+## Drag and Drop Zone
+
+```tsx
+'use client'
+
+import { useCallback } from 'react'
+import { useDropzone } from 'react-dropzone'
+import { useUploadThing } from '@/lib/uploadthing'
+
+export function DropZone() {
+  const { startUpload, isUploading } = useUploadThing('imageUploader')
+
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    try {
+      const result = await startUpload(acceptedFiles)
+      console.log('Upload complete:', result)
+    } catch (error) {
+      console.error('Upload failed:', error)
+    }
+  }, [startUpload])
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'image/*': ['.png', '.jpg', '.jpeg', '.webp']
+    },
+    maxFiles: 5,
+    disabled: isUploading
+  })
+
+  return (
+    <div
+      {...getRootProps()}
+      className={`border-2 border-dashed p-6 rounded-lg cursor-pointer
+        ${isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}`}
+    >
+      <input {...getInputProps()} />
+      <div className="text-center">
+        {isDragActive ? (
+          <p>Drop the files here...</p>
+        ) : (
+          <p>Drag & drop files here, or click to select</p>
+        )}
+      </div>
+    </div>
+  )
+}

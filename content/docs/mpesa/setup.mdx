@@ -3,9 +3,10 @@ title: Installation Guide
 ---
 
 Before you begin, ensure you have the following:
-- Node.js installed on your machine.
-- An active M-Pesa account with the necessary credentials.
-- A basic understanding of TypeScript (optional but recommended).
+
+-   Node.js installed on your machine.
+-   An active M-Pesa account with the necessary credentials.
+-   A basic understanding of TypeScript (optional but recommended).
 
 #### npm
 
@@ -28,11 +29,15 @@ pnpm add @zenetralabs/mpesa
 ## Setup
 
 <Callout title="Note">
-    To use the mpesa sdk, you need to initialize it with your credentials. Consider storing all these credentials in a `.env` file and using `dotenv` to load them into your application.
+    To use the mpesa sdk, you need to initialize it with your credentials.
+    Consider storing all these credentials in a `.env` file and using `dotenv`
+    to load them into your application.
 </Callout>
 
+### Basic Setup
+
 ```typescript title="index.ts"
-import { Mpesa } from '@zenetralabs/mpesa'
+import { Mpesa } from '@zenetralabs/mpesa';
 
 export const mpesa = new Mpesa({
     env: 'sandbox', // "sandbox" or "live"
@@ -45,12 +50,137 @@ export const mpesa = new Mpesa({
     password: 'PASSWORD',
     certFolderPath: 'CERT_FOLDER_ABSOLUTE_PATH',
     passkey: 'MPESA_PASSKEY'
-})
+});
 
 // STK Push code
 // B2C code
 // Check Transaction Status code
 // etc
+```
+
+### Using Environment Variables
+
+A more secure approach is to use environment variables. Here's an example using
+a Config object that loads values from environment variables:
+
+```typescript title="config.ts"
+import dotenv from 'dotenv';
+dotenv.config();
+
+export const Config = {
+    MPESA_ENV: process.env.MPESA_ENV || 'sandbox',
+    MPESA_PAYBILL: Number(process.env.MPESA_PAYBILL) || 0,
+    MPESA_CONSUMER_KEY: process.env.MPESA_CONSUMER_KEY || '',
+    MPESA_CONSUMER_SECRET: process.env.MPESA_CONSUMER_SECRET || '',
+    USER_NAME: process.env.MPESA_USERNAME || '',
+    PASSWORD: process.env.MPESA_PASSWORD || '',
+    MPESA_PASSKEY: process.env.MPESA_PASSKEY || ''
+};
+```
+
+```typescript title="mpesa.service.ts"
+import { Mpesa } from '@zenetralabs/mpesa';
+import { Config } from './config';
+import { Logger } from 'your-logger-library';
+import { Request, Response } from 'express';
+import { HttpStatusCode } from 'axios';
+
+interface IServerResponse {
+    status: string;
+    message: string;
+    data: any;
+}
+
+export const mpesa = new Mpesa({
+    env: Config.MPESA_ENV, // "sandbox" or "live"
+    type: 2, // 2 or 4
+    shortcode: Config.MPESA_PAYBILL,
+    store: Config.MPESA_PAYBILL,
+    key: Config.MPESA_CONSUMER_KEY,
+    secret: Config.MPESA_CONSUMER_SECRET,
+    username: Config.USER_NAME,
+    password: Config.PASSWORD,
+    certFolderPath: '../utils/certs',
+    passkey: Config.MPESA_PASSKEY
+});
+
+// Get stk push
+// @route POST /api/v1/payments/stk
+export const stkPush = async (req: Request, res: Response<IServerResponse>) => {
+    const { phone } = req.body;
+    try {
+        const { error, data } = await mpesa.stkPush({
+            phone: phone,
+            product: `Shown in stk push message`,
+            amount: 1,
+            CallBackURL: `https://todo.com/api/v1/pay/stk/callback`, // Must be https secure
+            description: `Description of this payment`
+        });
+
+        if (error) {
+            Logger.error({ message: 'Error initiating STK push: ' + error });
+
+            res.status(HttpStatusCode.BadRequest).json({
+                status: 'error',
+                message: 'Error initiating STK push',
+                data: null
+            });
+            return;
+        }
+
+        res.status(HttpStatusCode.Ok).json({
+            status: 'success',
+            message: 'STK push initiated successfully',
+            data: data
+        });
+    } catch (err) {
+        Logger.error({ message: 'Error initiating STK push: ' + err });
+
+        res.status(HttpStatusCode.InternalServerError).json({
+            status: 'error',
+            message: 'Error initiating STK push',
+            data: null
+        });
+    }
+};
+```
+
+## Certificate Structure
+
+When using the `certFolderPath` option, you need to organize your certificates
+in a specific folder structure. All certificates can be obtained from the
+[M-Pesa Daraja Portal](https://developer.safaricom.co.ke/).
+
+```
+certs/
+  ├── live/
+  │    └── cert.cer
+  └── sandbox/
+       └── cert.cer
+```
+
+<Callout title="Important">
+    - The SDK will automatically look for certificates in the appropriate
+    environment subfolder (live or sandbox) - Make sure to download the correct
+    certificates from the Daraja portal for each environment - The certificate
+    files must be named `cert.cer` - You only need to provide the path to the
+    parent `certs` folder in the `certFolderPath` configuration
+</Callout>
+
+### Example folder structure in your project
+
+```
+your-project/
+  ├── src/
+  │    ├── utils/
+  │    │    ├── certs/
+  │    │    │    ├── live/
+  │    │    │    │    └── cert.cer
+  │    │    │    └── sandbox/
+  │    │    │         └── cert.cer
+  │    │    └── config.ts
+  │    └── mpesa.service.ts
+  └── ...
 ```
 
 ## API Reference
@@ -63,18 +193,26 @@ export const mpesa = new Mpesa({
 | `store`          | `number` | Yes          | Alias for `shortcode`, used to identify the business account receiving payments.                                  | `4657849`                     |
 | `key`            | `string` | Yes          | Consumer Key from your M-Pesa API credentials.                                                                    | `"MPESA_B2C_CONSUMER_KEY"`    |
 | `secret`         | `string` | Yes          | Consumer Secret from your M-Pesa API credentials.                                                                 | `"MPESA_B2C_CONSUMER_SECRET"` |
-| `username`       | `string` | No           | Username required for certain B2B or B2C operations, depending on your M-Pesa account setup.                      | `"USER_NAME"`                 |
-| `password`       | `string` | No           | Password required for specific B2B or B2C operations, depending on your M-Pesa account setup.                     | `"PASSWORD"`                  |
+| `username`       | `string` | No           | Username required for certain B2B or B2C operations, The user is created in mpesa org portal.                     | `"USER_NAME"`                 |
+| `password`       | `string` | No           | Password required for specific B2B or B2C operations, The pass for the user created in mpesa org portal.          | `"PASSWORD"`                  |
 | `certFolderPath` | `string` | No           | Absolute path to the folder containing SSL certificates for secure requests (if required).                        | `"/path/to/certs"`            |
 | `passkey`        | `string` | Yes          | The M-Pesa passkey for generating secure payment requests, typically used in C2B transactions.                    | `"MPESA_PASSKEY"`             |
 
 ---
 
+<Callout title="Note">
+    - All the credentials above can be obtained from the M-Pesa daraja portal. -
+    - This includes the **certificates**, which are required for secure
+    communication with the M-Pesa API. - The **shortcode** and **store** are
+    typically the same for most businesses. (Buy Goods or Paybill)
+</Callout>
+
 ### IMPORTANT:
 
 <Callout title="Note">
-- Ensure your **consumer key**, **consumer secret**, and **passkey** match the environment you are using (`sandbox` or `live`).
-- `certFolderPath` is required for environments that mandate SSL/TLS certificate-based authentication.
-- `type` determines the context of the operations. Using the correct type is critical for accurate integration.
+    - Ensure your **consumer key**, **consumer secret**, and **passkey** match
+    the environment you are using (`sandbox` or `live`). - `certFolderPath` is
+    required for environments that mandate SSL/TLS certificate-based
+    authentication. - `type` determines the context of the operations. Using the
+    correct type is critical for accurate integration.
 </Callout>
-
